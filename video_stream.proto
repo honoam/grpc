@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package video_stream;
+
+service VideoStream {
+  rpc GetVideoList (VideoListRequest) returns (stream Video) {}
+  rpc StreamVideo (VideoRequest) returns (stream VideoChunk) {}
+}
+
+message VideoListRequest {}
+
+message Video {
+  string name = 1;
+}
+
+message VideoRequest {
+  string name = 1;
+}
+
+message VideoChunk {
+  bytes chunk = 1;
+}

@@ -1,60 +1,67 @@
 import grpc
 import tkinter as tk
 from tkinter import messagebox
-from tkinter import ttk
 import video_stream_pb2
 import video_stream_pb2_grpc
+import tempfile
+import os
+import subprocess
 
-class VideoStreamClient:
-    def __init__(self, channel):
-        self.channel = channel
-        self.stub = video_stream_pb2_grpc.VideoStreamStub(self.channel)
 
-    def get_video_list(self):
-        video_list_request = video_stream_pb2.VideoListRequest()
-        video_list_response = self.stub.GetVideoList(video_list_request)
-        return [video.name for video in video_list_response]
+def play_video():
+    selected_video = video_listbox.get(tk.ACTIVE)
+    if not selected_video:
+        messagebox.showwarning("Warning", "No video selected.")
+        return
 
-    def stream_video(self, selected_video):
-        video_request = video_stream_pb2.VideoRequest(name=selected_video)
-        video_chunks = self.stub.StreamVideo(video_request)
-        return video_chunks
+    channel = grpc.insecure_channel('localhost:50051')  # Replace with the server address
+    stub = video_stream_pb2_grpc.VideoStreamStub(channel)
 
-class VideoStreamGUI:
-    def __init__(self, client):
-        self.client = client
-        self.window = tk.Tk()
-        self.window.title("Video Stream Client")
+    video_request = video_stream_pb2.VideoRequest(name=selected_video)
+    video_chunk_responses = stub.StreamVideo(video_request)
 
-        self.video_list_var = tk.StringVar(value=self.client.get_video_list())
+    temp_file = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    temp_file_path = temp_file.name
+    temp_file.close()
 
-        self.video_listbox = tk.Listbox(self.window, listvariable=self.video_list_var, width=50)
-        self.video_listbox.pack(pady=10)
+    with open(temp_file_path, "wb") as f:
+        for chunk_response in video_chunk_responses:
+            f.write(chunk_response.chunk)
 
-        self.stream_button = ttk.Button(self.window, text="Stream", command=self.stream_video)
-        self.stream_button.pack(pady=5)
+    channel.close()
 
-    def stream_video(self):
-        selected_index = self.video_listbox.curselection()
-        if selected_index:
-            selected_video = self.video_listbox.get(selected_index)
-            video_chunks = self.client.stream_video(selected_video)
-            for chunk in video_chunks:
-                process_video_chunk(chunk.chunk)
-        else:
-            messagebox.showwarning("No Video Selected", "Please select a video to stream.")
+    subprocess.run(["vlc", temp_file_path])  # Play the video using VLC
 
-    def run(self):
-        self.window.mainloop()
+    os.remove(temp_file_path)  # Delete the temporary file
 
-def process_video_chunk(chunk):
-    # Process the video chunk as per your requirement
-    # For example, you can write it to a file or display it
-    # Here, we are just printing the length of the chunk
-    print(f"Received video chunk of length: {len(chunk)}")
 
-if __name__ == '__main__':
-    channel = grpc.insecure_channel('localhost:50051')
-    client = VideoStreamClient(channel)
-    gui = VideoStreamGUI(client)
-    gui.run()
+def populate_video_list():
+    channel = grpc.insecure_channel('localhost:50051')  # Replace with the server address
+    stub = video_stream_pb2_grpc.VideoStreamStub(channel)
+
+    video_list_request = video_stream_pb2.VideoListRequest()
+    video_list_response = stub.GetVideoList(video_list_request)
+
+    for video in video_list_response.videos:
+        video_listbox.insert(tk.END, video.name)
+
+    channel.close()
+
+
+# Create the GUI window
+window = tk.Tk()
+window.title("Video Stream Client")
+
+# Create a listbox to display the video list
+video_listbox = tk.Listbox(window)
+video_listbox.pack(pady=10)
+
+# Button to play the selected video
+play_button = tk.Button(window, text="Play", command=play_video)
+play_button.pack(pady=5)
+
+# Populate the video list
+populate_video_list()
+
+# Start the GUI event loop
+window.mainloop()

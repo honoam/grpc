@@ -1,0 +1,13 @@
+version: '3'
+services:
+  server:
+    image: my-python-ffmpeg-image
+    environment:
+      - SCRIPT_TO_RUN=server
+
+
+  client:
+    image: my-python-ffmpeg-image
+    environment:
+      - SCRIPT_TO_RUN=client
+

@@ -3,9 +3,10 @@ import tkinter as tk
 from tkinter import messagebox
 import video_stream_pb2
 import video_stream_pb2_grpc
-import tempfile
-import os
-import subprocess
+import cv2
+import numpy as np
+
+_ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
 
 def play_video():
@@ -14,25 +15,36 @@ def play_video():
         messagebox.showwarning("Warning", "No video selected.")
         return
 
-    channel = grpc.insecure_channel('localhost:50051')  # Replace with the server address
+    channel = grpc.insecure_channel('localhost:50051')
     stub = video_stream_pb2_grpc.VideoStreamStub(channel)
 
     video_request = video_stream_pb2.VideoRequest(name=selected_video)
-    video_chunk_responses = stub.StreamVideo(video_request)
 
-    temp_file = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-    temp_file_path = temp_file.name
-    temp_file.close()
+    try:
+        video_chunk_responses = stub.StreamVideo(video_request)
 
-    with open(temp_file_path, "wb") as f:
+        cv2.namedWindow("Video Stream", cv2.WINDOW_NORMAL)
+
         for chunk_response in video_chunk_responses:
-            f.write(chunk_response.chunk)
+            frame_data = np.frombuffer(chunk_response.chunk, dtype=np.uint8)
+            frame = cv2.imdecode(frame_data, cv2.IMREAD_COLOR)
 
-    channel.close()
+            # Check if the frame is valid
+            if frame is not None and frame.size[0] > 0 and frame.size[1] > 0:
+                cv2.imshow("Video Stream", frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            else:
+                print("Invalid frame received.")
 
-    subprocess.run(["vlc", temp_file_path])  # Play the video using VLC
+        cv2.destroyAllWindows()
 
-    os.remove(temp_file_path)  # Delete the temporary file
+    except grpc.RpcError as rpc_error:
+        print(f"Error during video streaming: {rpc_error}")
+        print(f"Debug error string: {rpc_error.debug_error_string}")
+
+    finally:
+        channel.close()
 
 
 def populate_video_list():
@@ -42,7 +54,7 @@ def populate_video_list():
     video_list_request = video_stream_pb2.VideoListRequest()
     video_list_response = stub.GetVideoList(video_list_request)
 
-    for video in video_list_response.videos:
+    for video in video_list_response:
         video_listbox.insert(tk.END, video.name)
 
     channel.close()
@@ -50,7 +62,7 @@ def populate_video_list():
 
 # Create the GUI window
 window = tk.Tk()
-window.title("Video Stream Client")
+window.title("Video Stream")
 
 # Create a listbox to display the video list
 video_listbox = tk.Listbox(window)

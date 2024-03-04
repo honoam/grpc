@@ -4,76 +4,73 @@ from tkinter import messagebox
 import video_stream_pb2
 import video_stream_pb2_grpc
 import cv2
-import numpy as np
+import threading
 
-_ONE_DAY_IN_SECONDS = 60 * 60 * 24
+class VideoClient:
+    def __init__(self):
+        self.channel = grpc.insecure_channel('45.159.197.153:50051')
+        self.stub = video_stream_pb2_grpc.VideoStreamStub(self.channel)
 
+        self.root = tk.Tk()
+        self.root.title("Video Stream Client")
 
-def play_video():
-    selected_video = video_listbox.get(tk.ACTIVE)
-    if not selected_video:
-        messagebox.showwarning("Warning", "No video selected.")
-        return
+        self.video_listbox = tk.Listbox(self.root)
+        self.video_listbox.pack(pady=10)
 
-    channel = grpc.insecure_channel('localhost:50051')
-    stub = video_stream_pb2_grpc.VideoStreamStub(channel)
+        self.play_button = tk.Button(self.root, text="Play", command=self.play_video)
+        self.play_button.pack(pady=5)
 
-    video_request = video_stream_pb2.VideoRequest(name=selected_video)
+        self.populate_video_list()
 
-    try:
-        video_chunk_responses = stub.StreamVideo(video_request)
+        self.root.mainloop()
 
-        cv2.namedWindow("Video Stream", cv2.WINDOW_NORMAL)
+    def populate_video_list(self):
+        video_list_request = video_stream_pb2.VideoListRequest()
+        video_list_response = self.stub.GetVideoList(video_list_request)
 
-        for chunk_response in video_chunk_responses:
-            frame_data = np.frombuffer(chunk_response.chunk, dtype=np.uint8)
-            frame = cv2.imdecode(frame_data, cv2.IMREAD_COLOR)
+        for video in video_list_response:
+            self.video_listbox.insert(tk.END, video.name)
 
-            # Check if the frame is valid
-            if frame is not None and frame.size[0] > 0 and frame.size[1] > 0:
-                cv2.imshow("Video Stream", frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-            else:
-                print("Invalid frame received.")
+    def play_video(self):
+        selected_video = self.video_listbox.get(tk.ACTIVE)
+        if not selected_video:
+            messagebox.showwarning("Warning", "No video selected.")
+            return
 
+        rtsp_url = self.get_rtsp_url(selected_video)
+
+        if rtsp_url:
+            print(f"RTSP URL for {selected_video}: {rtsp_url}")
+
+            # Start a new thread to display the video stream
+            threading.Thread(target=self.display_video, args=(rtsp_url,)).start()
+
+        else:
+            messagebox.showwarning("Error", "Failed to retrieve RTSP URL.")
+
+    def get_rtsp_url(self, video_name):
+        video_request = video_stream_pb2.VideoRequest(name=video_name)
+        rtsp_url_response = self.stub.StreamVideo(video_request)
+        return rtsp_url_response.url
+
+    def display_video(self, rtsp_url):
+        cap = cv2.VideoCapture(rtsp_url)
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+
+            if not ret:
+                break
+
+            cv2.imshow('Video Stream', frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        cap.release()
         cv2.destroyAllWindows()
 
-    except grpc.RpcError as rpc_error:
-        print(f"Error during video streaming: {rpc_error}")
-        print(f"Debug error string: {rpc_error.debug_error_string}")
+        self.channel.close()
 
-    finally:
-        channel.close()
-
-
-def populate_video_list():
-    channel = grpc.insecure_channel('localhost:50051')  # Replace with the server address
-    stub = video_stream_pb2_grpc.VideoStreamStub(channel)
-
-    video_list_request = video_stream_pb2.VideoListRequest()
-    video_list_response = stub.GetVideoList(video_list_request)
-
-    for video in video_list_response:
-        video_listbox.insert(tk.END, video.name)
-
-    channel.close()
-
-
-# Create the GUI window
-window = tk.Tk()
-window.title("Video Stream")
-
-# Create a listbox to display the video list
-video_listbox = tk.Listbox(window)
-video_listbox.pack(pady=10)
-
-# Button to play the selected video
-play_button = tk.Button(window, text="Play", command=play_video)
-play_button.pack(pady=5)
-
-# Populate the video list
-populate_video_list()
-
-# Start the GUI event loop
-window.mainloop()
+if __name__ == "__main__":
+    client = VideoClient()

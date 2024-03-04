@@ -1,13 +1,19 @@
 version: '3'
 services:
   server:
-    image: my-python-ffmpeg-image
+    image: mgrpcvideo:latest
     environment:
       - SCRIPT_TO_RUN=server
+      - VIDEO_DIR=/app/videos
+    ports:
+      - "50051:50051"
+      - "8554:8554"
+    volumes:
+      - .:/app
 
 
-  client:
-    image: my-python-ffmpeg-image
-    environment:
-      - SCRIPT_TO_RUN=client
+  # client:
+  #   image: my-python-ffmpeg-image
+  #   environment:
+  #     - SCRIPT_TO_RUN=client
 

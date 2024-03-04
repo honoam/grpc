@@ -5,57 +5,72 @@ import time
 from concurrent import futures
 import video_stream_pb2
 import video_stream_pb2_grpc
-import ffmpeg  # Import the ffmpeg module
-import tempfile
+import subprocess
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
-VIDEO_DIR = "C:\\Users\\Administrator\\Desktop\\grpc\\grpc\\videos"
-
+VIDEO_DIR = os.getenv("VIDEO_DIR", "/apps/videos")
 
 class VideoStreamServicer(video_stream_pb2_grpc.VideoStreamServicer):
-    import tempfile
-
+    
     def StreamVideo(self, request, context):
-        video_file_path = os.path.abspath(os.path.join(VIDEO_DIR, request.name))
+        video_file_path = os.path.join(os.path.abspath(VIDEO_DIR), request.name)
 
         if not os.path.exists(video_file_path):
             context.abort(grpc.StatusCode.NOT_FOUND, f"Video file not found: {video_file_path}")
 
         try:
-            # Use ffmpeg-python to encode the video and write to a temporary file
-            input_stream = ffmpeg.input(video_file_path)
-            temp_file = tempfile.NamedTemporaryFile(suffix=".ts", delete=False)
-            temp_file_path = temp_file.name
-            temp_file.close()
+            # Construct FFmpeg command
+            rtsp_url = f"rtsp://45.159.197.153:8554/{request.name}"
+            self.start_rtsp_server(video_file_path, rtsp_url)
 
-            ffmpeg_cmd = (
-                input_stream
-                .output(temp_file_path, format='mpegts', codec='libx264', preset='ultrafast', tune='zerolatency')
-                .global_args('-loglevel', 'quiet')
-                .global_args('-stats')
-                .run_async()
-            )
-        except Exception as e:
-            context.abort(grpc.StatusCode.INTERNAL, f"Error starting FFmpeg process: {e}")
-        finally:
-            os.chdir(os.path.dirname(os.path.abspath(__file__)))
+            # Wait for the RTSP server to be ready
+            time.sleep(2)
 
-        try:
-            # Read from the temporary file and yield chunks
-            with open(temp_file_path, "rb") as temp_file:
-                for chunk in iter(lambda: temp_file.read(4096), b""):
-                    yield video_stream_pb2.VideoChunk(chunk=chunk)
+            # Return the RTSP URL to the client
+            return video_stream_pb2.VideoUrl(url=rtsp_url)
+
         except Exception as e:
-            context.abort(grpc.StatusCode.INTERNAL, f"Error during video streaming: {e}")
-        finally:
-            ffmpeg_cmd.wait()  # Wait for FFmpeg to finish (optional, depending on your use case)
-            os.remove(temp_file_path)  # Remove the temporary file
+            context.abort(grpc.StatusCode.INTERNAL, f"Exception during video streaming: {e}")
+
+    def get_video_codec(self, video_file_path):
+        ffprobe_cmd = [
+            'ffprobe',
+            '-v', 'error',
+            '-select_streams', 'v:0',
+            '-show_entries', 'stream=codec_name',
+            '-of', 'json',
+            video_file_path
+        ]
+
+        result = subprocess.run(ffprobe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        print(result)
+        return None
 
     def GetVideoList(self, request, context):
         video_files = glob.glob(os.path.join(VIDEO_DIR, "*.mp4"))
+        print("Video Files:", video_files)
         for video_file in video_files:
             video_name = os.path.basename(video_file)
             yield video_stream_pb2.Video(name=video_name)
+
+    def start_rtsp_server(self, video_file_path, rtsp_url):
+        # print(video_file_path)
+        # self.get_video_codec(video_file_path)
+        ffmpeg_cmd = [
+            'ffmpeg',
+            '-re',
+            '-stream_loop', '-1',  # Loop the input indefinitely
+            '-i', video_file_path,
+            '-c:v', 'h264',  # Copy video codec
+            '-c:a', 'aac',
+            '-f', 'rtsp',
+            '-rtsp_transport', 'tcp',  # Use TCP transport for RTSP
+            rtsp_url
+        ]
+        process =  subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=-1)
+        out, err = process.communicate()
+        print("FFmpeg Process Output:", out.decode('utf-8'))
+        print("FFmpeg Process Errors:", err.decode('utf-8'))
 
 
 def serve():
@@ -69,7 +84,6 @@ def serve():
             time.sleep(_ONE_DAY_IN_SECONDS)
     except KeyboardInterrupt:
         server.stop(0)
-
 
 if __name__ == "__main__":
     serve()

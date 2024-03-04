@@ -4,7 +4,7 @@ package video_stream;
 
 service VideoStream {
   rpc GetVideoList (VideoListRequest) returns (stream Video) {}
-  rpc StreamVideo (VideoRequest) returns (stream VideoChunk) {}
+  rpc StreamVideo (VideoRequest) returns (VideoUrl) {}
 }
 
 message VideoListRequest {}
@@ -17,6 +17,6 @@ message VideoRequest {
   string name = 1;
 }
 
-message VideoChunk {
-  bytes chunk = 1;
+message VideoUrl {
+  string url = 1;
 }

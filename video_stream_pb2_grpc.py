@@ -19,10 +19,10 @@ class VideoStreamStub(object):
                 request_serializer=video__stream__pb2.VideoListRequest.SerializeToString,
                 response_deserializer=video__stream__pb2.Video.FromString,
                 )
-        self.StreamVideo = channel.unary_stream(
+        self.StreamVideo = channel.unary_unary(
                 '/video_stream.VideoStream/StreamVideo',
                 request_serializer=video__stream__pb2.VideoRequest.SerializeToString,
-                response_deserializer=video__stream__pb2.VideoChunk.FromString,
+                response_deserializer=video__stream__pb2.VideoUrl.FromString,
                 )
 
 
@@ -49,10 +49,10 @@ def add_VideoStreamServicer_to_server(servicer, server):
                     request_deserializer=video__stream__pb2.VideoListRequest.FromString,
                     response_serializer=video__stream__pb2.Video.SerializeToString,
             ),
-            'StreamVideo': grpc.unary_stream_rpc_method_handler(
+            'StreamVideo': grpc.unary_unary_rpc_method_handler(
                     servicer.StreamVideo,
                     request_deserializer=video__stream__pb2.VideoRequest.FromString,
-                    response_serializer=video__stream__pb2.VideoChunk.SerializeToString,
+                    response_serializer=video__stream__pb2.VideoUrl.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -92,8 +92,8 @@ class VideoStream(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/video_stream.VideoStream/StreamVideo',
+        return grpc.experimental.unary_unary(request, target, '/video_stream.VideoStream/StreamVideo',
             video__stream__pb2.VideoRequest.SerializeToString,
-            video__stream__pb2.VideoChunk.FromString,
+            video__stream__pb2.VideoUrl.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

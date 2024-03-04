@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12video_stream.proto\x12\x0cvideo_stream\"\x12\n\x10VideoListRequest\"\x15\n\x05Video\x12\x0c\n\x04name\x18\x01 \x01(\t\"\x1c\n\x0cVideoRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\"\x1b\n\nVideoChunk\x12\r\n\x05\x63hunk\x18\x01 \x01(\x0c\x32\x9f\x01\n\x0bVideoStream\x12G\n\x0cGetVideoList\x12\x1e.video_stream.VideoListRequest\x1a\x13.video_stream.Video\"\x00\x30\x01\x12G\n\x0bStreamVideo\x12\x1a.video_stream.VideoRequest\x1a\x18.video_stream.VideoChunk\"\x00\x30\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12video_stream.proto\x12\x0cvideo_stream\"\x12\n\x10VideoListRequest\"\x15\n\x05Video\x12\x0c\n\x04name\x18\x01 \x01(\t\"\x1c\n\x0cVideoRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\"\x17\n\x08VideoUrl\x12\x0b\n\x03url\x18\x01 \x01(\t2\x9b\x01\n\x0bVideoStream\x12G\n\x0cGetVideoList\x12\x1e.video_stream.VideoListRequest\x1a\x13.video_stream.Video\"\x00\x30\x01\x12\x43\n\x0bStreamVideo\x12\x1a.video_stream.VideoRequest\x1a\x16.video_stream.VideoUrl\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -27,8 +27,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['_VIDEO']._serialized_end=77
   _globals['_VIDEOREQUEST']._serialized_start=79
   _globals['_VIDEOREQUEST']._serialized_end=107
-  _globals['_VIDEOCHUNK']._serialized_start=109
-  _globals['_VIDEOCHUNK']._serialized_end=136
-  _globals['_VIDEOSTREAM']._serialized_start=139
-  _globals['_VIDEOSTREAM']._serialized_end=298
+  _globals['_VIDEOURL']._serialized_start=109
+  _globals['_VIDEOURL']._serialized_end=132
+  _globals['_VIDEOSTREAM']._serialized_start=135
+  _globals['_VIDEOSTREAM']._serialized_end=290
 # @@protoc_insertion_point(module_scope)
